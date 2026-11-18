@@ -53,3 +53,24 @@ def test_reliability_features():
     assert r2.item() > 0.99 and rho.item() > 0.99
     r2, rho = reliability_features(x, torch.zeros_like(x))
     assert abs(r2.item()) < 1e-4 and rho.item() == 0.0
+
+
+def test_cyclenet_backbone_init_equality():
+    cfg = dict(backbone='cyclenet_itransformer', d_model=64, d_ff=64, e_layers=2, n_heads=8, dropout=0.1,
+               activation='gelu', use_revin=1)
+    ys = {}
+    x, t0 = torch.randn(3, 96, 5), torch.tensor([0, 7, 300])
+    for m in ('orig', 'rcf', 'rg'):
+        torch.manual_seed(1)
+        mm = build_model(m, 5, 720, cfg, 168, device='cpu').eval()
+        with torch.no_grad():
+            ys[m] = mm(x, t0)
+    assert ys['orig'].shape == (3, 720, 5)
+    assert torch.equal(ys['orig'], ys['rcf']) and torch.equal(ys['orig'], ys['rg'])
+
+
+def test_cyclenet_lr_schedule():
+    from rgcycle.trainer import cyclenet_epoch_lr
+    lr = [cyclenet_epoch_lr(e, 1.0) for e in range(1, 8)]
+    assert lr[:4] == [1 / 25, 1.0, 1.0, 1.0]
+    assert abs(lr[4] - 0.8) < 1e-12 and abs(lr[6] - 0.8 ** 3) < 1e-12

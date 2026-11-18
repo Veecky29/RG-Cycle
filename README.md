@@ -1,8 +1,8 @@
 # RG-Cycle: Reliability-Gated Cycle Prior for Long-Term Time-Series Forecasting
 
 RG-Cycle 是一个可插到任意预测主干上的周期先验模块。它在 CycleNet 的 RCF（Residual Cycle Forecasting）基础上，
-为每个样本、每个通道和每个预测步长学习“用多少周期先验”。本仓库包含 iTransformer 主干、RCF 基线、RG-Cycle、
-训练脚本和第一天试点实验（iTransformer × {Traffic, Electricity, ETTh1} × H∈{96, 720}）的调度器。
+为每个样本、每个通道和每个预测步长学习“用多少周期先验”。本仓库包含 iTransformer 主干（与 CycleNet 官方代码逐位一致）、RCF 基线、RG-Cycle、
+训练脚本和第一天试点实验（iTransformer × {Traffic, Electricity, ETTh1} × H∈{96, 720}，按 CycleNet 论文的设置）的调度器。
 
 RG-Cycle is a plug-in cycle prior for any forecasting backbone. It extends CycleNet's Residual Cycle Forecasting (RCF)
 with a reliability gate that decides, per sample, channel and horizon step, how much of the learned cycle to remove from
@@ -49,14 +49,28 @@ Gate parameters use 10× the scheduled learning rate (their own Adam group); eve
 
 ## Backbone and recipe
 
-`rgcycle/backbones.py` is the iTransformer-style channel-token backbone (2 layers, 8 heads, `d_ff = 2·d_model`,
-dropout 0.1, RevIN without affine, no timestamp tokens). With `rng_compat_kernel` it consumes random numbers in the same
-order as the PAC-Former code, so its initial weights are bit-identical to the PAC-Former ablation variant B.
+The day-1 pilot follows the CycleNet paper (Lin et al., NeurIPS 2024, Table 4) and its official code
+(github.com/ACAT-SCUT/CycleNet @ d807e51):
 
-Training (`rgcycle/trainer.py`): Adam (β = 0.9/0.999, no weight decay), batch 32, at most 50 epochs, early stopping
-with patience 5 on full-validation MSE, best-validation checkpoint, 1-epoch linear warm-up from 0.1× then cosine to
-0.01× over 50 planned epochs (per step), FP32 with TF32 disabled for matmul, deterministic algorithms, lookback 96,
-every test window evaluated (no drop_last).
+- Backbone `CycleNetITransformer` (`rgcycle/backbones.py`) is CycleNet's `models/CycleiTransformer.py` without the
+  cycle: inverted embedding, `e_layers` encoder layers (full attention, Conv1d-k1 FFN, GELU, post-LN), final LayerNorm,
+  linear projector, Non-stationary-Transformer normalisation, no timestamp tokens. With the same seed its initial
+  weights and its outputs (orig, and +RCF with any Q) are bitwise identical to the official module
+  (`pilot/smoke_test_cyclenet.py`).
+- Hyper-parameters per dataset/H from `scripts/iTransformer/{traffic,electricity}.sh`; ETTh1 (not part of CycleNet's
+  iTransformer experiments) from the official iTransformer ETTh1 script and iTransformer `run.py` defaults.
+  Every value and its source file/line is in `configs/pilot_day1_cyclenet.json`.
+- Training (`rgcycle/trainer.py`, recipe `cyclenet`): Adam, MSE, shuffled training batches with drop_last, at most
+  `train_epochs` epochs, early stopping with `patience` on the validation loss, best-validation checkpoint.
+  Learning rate as the official code actually runs it (`lradj=type3` plus an un-stepped `OneCycleLR` whose constructor
+  sets lr/25): epoch 1 at lr/25, epochs 2–4 at lr, then ×0.8 per epoch. Validation loss = mean of per-batch MSE over a
+  shuffled, drop_last validation loader; test = every window (drop_last=False, as in CycleNet).
+- orig, +RCF and +RG use the same recipe. RG adds only the gate (b0 = −2, gate lr ×10).
+- FP32, TF32 at PyTorch defaults (off for matmul, on for cuDNN convolutions, as in the official code), plus
+  deterministic algorithms (the official code is not deterministic; this changes no hyper-parameter).
+
+The older PAC-Former-recipe configuration (`configs/pilot_day1.json`, backbone `pacformer_b`, recipe `pacformer`)
+is kept for reference; it reproduces the PAC-Former variant-B runs bit-for-bit.
 
 ## Layout
 
@@ -67,10 +81,12 @@ rgcycle/data.py        chronological splits, train-only scaler, GPU windows with
 rgcycle/trainer.py     training / evaluation / gate statistics
 train.py               single-job CLI
 configs/datasets.json  dataset audit (SHA-256, splits)
-configs/pilot_day1.json  day-1 pilot: groups, hyper-parameters, W, gate settings, reference numbers
+configs/pilot_day1_cyclenet.json  day-1 pilot under the CycleNet protocol (values + source file/line)
+configs/pilot_day1.json  earlier PAC-Former-recipe variant (reference only)
 pilot/run_pilot.py     --init (freeze jobs) / scheduler (2 workers, resumable) / per-group reports
 pilot/launch.sh        background launcher (refuses if running, completed, or GPU busy)
-pilot/smoke_test.py    GPU smoke test
+pilot/smoke_test_cyclenet.py  GPU smoke test (official-code equivalence, determinism, timing, 2-worker memory)
+pilot/smoke_test.py    GPU smoke test for the PAC-Former-recipe variant
 tests/test_rgcycle.py  CPU unit tests
 results/smoke_report_20261119.json  GPU smoke test on RTX 4090 (19 Nov 2026)
 ```
@@ -81,18 +97,19 @@ results/smoke_report_20261119.json  GPU smoke test on RTX 4090 (19 Nov 2026)
 python -m pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu121
 # data: the seven benchmark CSVs (same files and SHA-256 as configs/datasets.json) in data/benchmark/
 
-# single job
-python train.py --dataset Traffic --horizon 96 --mode rg --seed 2026 --lr 0.001 --d-model 256 \
-    --kernel-size 5 --cycle 168 --out outputs/traffic_h96_rg_s2026
+# single job (any group of a pilot config)
+python train.py --config configs/pilot_day1_cyclenet.json --dataset Traffic --horizon 96 --mode rg --seed 2026 \
+    --out outputs/traffic_h96_rg_s2026
 
-# day-1 pilot
-python pilot/run_pilot.py --run-dir RUN --init --data-dir data/benchmark --audit configs/datasets.json \
-    [--orig-dir PATH_TO_EXISTING_B_RUNS]
+# day-1 pilot (CycleNet protocol, 54 jobs: orig / +RCF / +RG x 6 groups x 3 seeds)
+python pilot/run_pilot.py --run-dir RUN --init --data-dir data/benchmark --audit configs/datasets.json
 bash pilot/launch.sh RUN python
 ```
 
-Without `--orig-dir` the pilot also trains the backbone alone (`orig`), giving 54 jobs; with it, existing backbone
-results are reused and 36 jobs are trained.
+## Third-party code
+
+`rgcycle/backbones.py` (CycleNet iTransformer section) and `rgcycle/cycle.py` (`RecurrentCycle`) are adapted from
+CycleNet (Apache-2.0); see `THIRD_PARTY_NOTICES.md`.
 
 ## References
 

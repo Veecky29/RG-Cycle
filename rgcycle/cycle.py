@@ -19,7 +19,7 @@ for any gate value.
 import torch
 from torch import nn
 
-from .backbones import ITransformer
+from .backbones import CycleNetITransformer, ITransformer
 
 MODES = ('orig', 'rcf', 'rg')
 
@@ -115,10 +115,24 @@ class CycleForecaster(nn.Module):
 
 
 def build_model(mode, channels, horizon, cfg, cycle_len=None, gate_init_bias=-2.0, seq_len=96, device='cuda'):
-    """Backbone first (same random draws as PAC-Former variant B), then zero/constant-initialised extras."""
+    """Backbone first, then zero/constant-initialised extras (no random draws), so orig/rcf/rg share the
+    same initial backbone weights for a given seed.
+
+    cfg['backbone'] == 'cyclenet_itransformer' (default for the CycleNet-protocol pilot): CycleNet's iTransformer
+    with cfg keys d_model, d_ff, e_layers, n_heads, dropout, activation, use_revin.
+    cfg['backbone'] == 'pacformer_b': the PAC-Former variant-B backbone (d_model, kernel_size).
+    """
     assert mode in MODES, mode
-    backbone = ITransformer(channels, seq_len, horizon, d_model=cfg['d_model'], n_heads=8, e_layers=2,
-                            d_ff=2 * cfg['d_model'], dropout=0.1, rng_compat_kernel=cfg.get('kernel_size'))
+    kind = cfg.get('backbone', 'pacformer_b')
+    if kind == 'cyclenet_itransformer':
+        backbone = CycleNetITransformer(channels, seq_len, horizon, d_model=cfg['d_model'], n_heads=cfg['n_heads'],
+                                        e_layers=cfg['e_layers'], d_ff=cfg['d_ff'], dropout=cfg['dropout'],
+                                        activation=cfg.get('activation', 'gelu'), use_revin=bool(cfg.get('use_revin', 1)))
+    elif kind == 'pacformer_b':
+        backbone = ITransformer(channels, seq_len, horizon, d_model=cfg['d_model'], n_heads=8, e_layers=2,
+                                d_ff=2 * cfg['d_model'], dropout=0.1, rng_compat_kernel=cfg.get('kernel_size'))
+    else:
+        raise ValueError(kind)
     model = backbone if mode == 'orig' else CycleForecaster(backbone, channels, seq_len, horizon, cycle_len,
                                                             mode, gate_init_bias)
     return model.to(device)

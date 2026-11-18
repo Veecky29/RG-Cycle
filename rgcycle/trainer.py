@@ -1,4 +1,15 @@
-"""Training recipe (identical to the PAC-Former ablation runs).
+"""Two training recipes, selected by cfg['recipe'].
+
+'cyclenet' (CycleNet official exp/exp_main.py + utils/tools.py + data_provider/data_factory.py @ d807e51):
+  Adam(lr), MSE loss, batch cfg['batch_size'] (train: shuffle, drop_last=True), at most cfg['train_epochs'] epochs,
+  EarlyStopping(patience=cfg['patience']) on the validation loss, best-validation checkpoint.
+  Learning rate per epoch (lradj='type3', the run.py default; the scripts do not set lradj): exp_main builds a
+  OneCycleLR(max_lr=lr) that is never stepped for type3, but its constructor sets the optimiser lr to lr/25,
+  so epoch 1 runs at lr/25; after epoch e, adjust_learning_rate sets lr if e < 3 else lr*0.8**(e-3).
+  Validation loss = mean over batches of the batch MSE, val loader with shuffle=True and drop_last=True
+  (CycleNet data_factory: every flag except test/pred). Test: all windows (drop_last=False), element-wise mean.
+
+'pacformer' (the PAC-Former ablation recipe, kept for the bit-exact check against variant B):
 
 Adam (betas .9/.999, eps 1e-8, no weight decay), batch 32 (last partial training batch dropped, as before),
 at most 50 epochs, early stopping patience 5 on full-validation MSE, best-validation checkpoint,
@@ -69,6 +80,28 @@ def lr_at(step, steps, peak):
         return peak * (0.1 + 0.9 * step / max(1, steps - 1))
     progress = (step - steps) / max(1, 50 * steps - steps - 1)
     return peak * (0.01 + 0.99 * 0.5 * (1 + math.cos(math.pi * progress)))
+
+
+def cyclenet_epoch_lr(epoch, peak):
+    """lr used during (1-based) epoch under CycleNet's lradj='type3' + unstepped OneCycleLR(div_factor=25)."""
+    if epoch == 1:
+        return peak / 25.0
+    e = epoch - 1  # adjust_learning_rate(epoch=e) ran after epoch e
+    return peak if e < 3 else peak * (0.8 ** (e - 3))
+
+
+def cyclenet_val_loss(model, series, h, batch_size, generator):
+    """CycleNet vali(): shuffled val loader with drop_last=True, np.average of per-batch MSE."""
+    model.eval()
+    a, b = series.bounds(h, 'val')
+    n = b - a
+    order = torch.randperm(n, generator=generator) + a
+    losses = []
+    with torch.no_grad():
+        for i in range(n // batch_size):
+            x, y, t0 = series.batch(order[i * batch_size:(i + 1) * batch_size], h)
+            losses.append(torch.nn.functional.mse_loss(model(x, t0), y).double())
+    return float(torch.stack(losses).mean().item())
 
 
 def make_optimizer(model, lr, gate_lr_mult=1.0):
@@ -188,9 +221,17 @@ def fit_job(series, h, cfg, seed, path, mode, cycle_len=None, gate_init_bias=-2.
     generator = torch.Generator(device='cpu').manual_seed(seed)
     model = build_model(mode, series.channels, h, cfg, cycle_len, gate_init_bias)
     optimizer = make_optimizer(model, cfg['learning_rate'], gate_lr_mult if mode == 'rg' else 1.0)
+    cyclenet = cfg.get('recipe') == 'cyclenet'
+    bs = cfg['batch_size'] if cyclenet else BATCH
+    if cyclenet:
+        max_epochs = min(max_epochs, cfg['train_epochs'])
+        patience_limit = cfg['patience']
+        val_generator = torch.Generator(device='cpu').manual_seed(seed + 1_000_003)
+    else:
+        patience_limit = PATIENCE
     a, b = series.bounds(h, 'train')
     n = b - a
-    steps = n // BATCH
+    steps = n // bs
     best, best_epoch, patience, epochs, start_epoch = float('inf'), 0, 0, [], 1
     ckpt = path / 'best.pt'
     torch.cuda.reset_peak_memory_stats()
@@ -200,6 +241,8 @@ def fit_job(series, h, cfg, seed, path, mode, cycle_len=None, gate_init_bias=-2.
         model.load_state_dict(s['model_state'])
         optimizer.load_state_dict(s['optimizer_state'])
         generator.set_state(s['shuffle_rng'])
+        if cyclenet:
+            val_generator.set_state(s['val_rng'])
         torch.set_rng_state(s['torch_rng'])
         torch.cuda.set_rng_state_all(s['cuda_rng'])
         np.random.set_state(s['numpy_rng'])
@@ -207,7 +250,7 @@ def fit_job(series, h, cfg, seed, path, mode, cycle_len=None, gate_init_bias=-2.
         best, best_epoch, patience, epochs = s['best'], s['best_epoch'], s['patience'], s['epochs']
         start_epoch = s['epoch'] + 1
         del s
-    if patience >= PATIENCE:
+    if patience >= patience_limit:
         start_epoch = max_epochs + 1
     job = dict(dataset=series.name, horizon=h, mode=mode, seed=seed, config=cfg, cycle_len=cycle_len,
                gate_init_bias=gate_init_bias if mode == 'rg' else None,
@@ -220,10 +263,14 @@ def fit_job(series, h, cfg, seed, path, mode, cycle_len=None, gate_init_bias=-2.
             model.train()
             order = torch.randperm(n, generator=generator) + a
             tsum = torch.zeros((), dtype=torch.float64, device='cuda')
-            for i in range(steps):
-                lr = lr_at((epoch - 1) * steps + i, steps, cfg['learning_rate'])
+            if cyclenet:
+                lr = cyclenet_epoch_lr(epoch, cfg['learning_rate'])
                 set_lr(optimizer, lr)
-                x, y, t0 = series.batch(order[i * BATCH:(i + 1) * BATCH], h)
+            for i in range(steps):
+                if not cyclenet:
+                    lr = lr_at((epoch - 1) * steps + i, steps, cfg['learning_rate'])
+                    set_lr(optimizer, lr)
+                x, y, t0 = series.batch(order[i * bs:(i + 1) * bs], h)
                 optimizer.zero_grad()
                 loss = torch.nn.functional.mse_loss(model(x, t0), y)
                 loss.backward()
@@ -232,7 +279,10 @@ def fit_job(series, h, cfg, seed, path, mode, cycle_len=None, gate_init_bias=-2.
             train_mse = float((tsum / steps).item())
             if not np.isfinite(train_mse):
                 raise FloatingPointError(f'non-finite training loss {job}')
-            val = evaluate(model, series, h, 'val')
+            if cyclenet:
+                val = dict(mse=cyclenet_val_loss(model, series, h, bs, val_generator), mae=None)
+            else:
+                val = evaluate(model, series, h, 'val')
             improved = val['mse'] < best
             if improved:
                 best, best_epoch, patience = val['mse'], epoch, 0
@@ -240,7 +290,7 @@ def fit_job(series, h, cfg, seed, path, mode, cycle_len=None, gate_init_bias=-2.
                                         job=job, best_epoch=best_epoch, best_val_mse=best))
             else:
                 patience += 1
-            rec = dict(epoch=epoch, lr_last=lr, train_mse=train_mse, val_mse=val['mse'], val_mae=val['mae'],
+            rec = dict(epoch=epoch, lr_last=lr, lr_gate=lr * gate_lr_mult if mode == 'rg' else None, train_mse=train_mse, val_mse=val['mse'], val_mae=val['mae'],
                        improved=improved, seconds=time.perf_counter() - t, utc=utc())
             epochs.append(rec)
             elog.write(json.dumps(rec) + '\n')
@@ -249,15 +299,17 @@ def fit_job(series, h, cfg, seed, path, mode, cycle_len=None, gate_init_bias=-2.
                                                 optimizer_state=optimizer.state_dict(), shuffle_rng=generator.get_state(),
                                                 torch_rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state_all(),
                                                 numpy_rng=np.random.get_state(), python_rng=random.getstate(),
+                                                val_rng=val_generator.get_state() if cyclenet else None,
                                                 best=best, best_epoch=best_epoch, patience=patience, epochs=epochs))
             status_cb(dict(epoch=epoch, val_mse=val['mse'], best_val_mse=best, utc=utc()))
-            log(f"{series.name} H{h} {mode} seed{seed} epoch {epoch} train {train_mse:.6f} val {val['mse']:.9f} "
+            log(f"{series.name} H{h} {mode} seed{seed} epoch {epoch} train {train_mse:.6f} lr {lr:.3g} val {val['mse']:.9f} "
                 f"best {best:.9f} {rec['seconds']:.1f}s")
-            if patience >= PATIENCE:
+            if patience >= patience_limit:
                 break
     model.load_state_dict(torch.load(ckpt, map_location='cpu', weights_only=True)['model_state'], strict=True)
-    val = evaluate(model, series, h, 'val')
-    assert val['mse'] == best
+    val = evaluate(model, series, h, 'val')  # full validation set (reported only)
+    if not cyclenet:
+        assert val['mse'] == best
     test = evaluate(model, series, h, 'test')
     result = dict(status='completed', **job, best_val_mse=best, best_epoch=best_epoch, epochs_ran=len(epochs),
                   val=val, test=test, parameters=sum(p.numel() for p in model.parameters()),

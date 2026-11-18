@@ -25,7 +25,7 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 CODE_FILES = ['rgcycle/__init__.py', 'rgcycle/backbones.py', 'rgcycle/cycle.py', 'rgcycle/data.py',
-              'rgcycle/trainer.py', 'pilot/run_pilot.py', 'configs/pilot_day1.json']
+              'rgcycle/trainer.py', 'pilot/run_pilot.py']
 
 
 def read(p):
@@ -50,7 +50,7 @@ def init(run, data_dir, audit, orig_dir, config):
     run.mkdir(parents=True, exist_ok=True)
     cfgall = read(config)
     seeds, jobs, orig = cfgall['seeds'], [], {}
-    modes = list(cfgall['modes'])
+    modes = [m for m in cfgall['modes'] if m != 'orig']
     if not orig_dir:
         modes = ['orig'] + modes
     for g in cfgall['groups']:
@@ -59,30 +59,32 @@ def init(run, data_dir, audit, orig_dir, config):
         if orig_dir:
             rs = [read(Path(orig_dir) / ds / f'H{h}' / 'B' / f'seed_{s}' / 'result.json') for s in seeds]
             for r, s in zip(rs, seeds):
-                assert r['status'] == 'completed' and r['seed'] == s and r['config'] == cfg, (key, s)
+                assert r['status'] == 'completed' and r['seed'] == s, (key, s)
+                assert all(r['config'].get(k) == v for k, v in cfg.items() if k in r['config']), (key, s)
             orig[key] = dict(source=str(Path(orig_dir) / ds / f'H{h}' / 'B'), seeds=seeds,
                              test_mse=[r['test']['mse'] for r in rs], test_mae=[r['test']['mae'] for r in rs],
                              best_epoch=[r['best_epoch'] for r in rs], epochs_ran=[r['epochs_ran'] for r in rs],
                              elapsed_s=[r['elapsed_seconds'] for r in rs])
         for m in modes:
             for s in seeds:
-                jobs.append(dict(dataset=ds, horizon=h, mode=m, seed=s, cycle_len=cfgall['cycle_len'][ds], **cfg))
+                jobs.append(dict(dataset=ds, horizon=h, mode=m, seed=s, cycle_len=cfgall['cycle_len'][ds], config=cfg))
     protocol = dict(name=cfgall['name'], created_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
                     data_dir=str(data_dir), audit=str(audit), audit_sha256=sha(audit), orig_dir=str(orig_dir or ''),
                     gate=cfgall['gate'], cycle_len=cfgall['cycle_len'], seeds=seeds, workers=cfgall['workers'],
-                    recipe='Adam(.9,.999,eps1e-8,wd0) bs32 max50 patience5 warmup1ep(0.1x)+cosine->0.01x/50ep per step; '
-                           'best-val ckpt; FP32 TF32-off matmul; deterministic; L=96; test drop_last=False',
+                    config_file=str(Path(config).resolve()), config_sha256=sha(config),
+                    pilot_config={k: v for k, v in cfgall.items() if k not in ('refs',)},
                     code_sha256={f: sha(REPO / f) for f in CODE_FILES}, refs=cfgall['refs'], orig=orig, jobs=jobs)
     (run / 'results' / 'group_done').mkdir(parents=True, exist_ok=True)
     (run / 'protocol.json').write_text(json.dumps(protocol, indent=2))
     with open(run / 'jobs.csv', 'w', newline='') as fh:
         w = csv.writer(fh)
-        w.writerow(['#', 'dataset', 'H', 'mode', 'seed', 'lr', 'd_model', 'cycle_len', 'gate_init_bias', 'gate_lr_mult'])
+        keys = [k for k in jobs[0]['config'] if k not in ('backbone', 'recipe')]
+        w.writerow(['#', 'dataset', 'H', 'mode', 'seed'] + keys + ['cycle_len', 'gate_init_bias', 'gate_lr_mult'])
         for i, j in enumerate(jobs, 1):
             rg = j['mode'] == 'rg'
-            w.writerow([i, j['dataset'], j['horizon'], j['mode'], j['seed'], j['learning_rate'], j['d_model'],
-                        j['cycle_len'] if j['mode'] != 'orig' else '', cfgall['gate']['init_bias'] if rg else '',
-                        cfgall['gate']['lr_mult'] if rg else ''])
+            w.writerow([i, j['dataset'], j['horizon'], j['mode'], j['seed']] + [j['config'].get(k, '') for k in keys]
+                       + [j['cycle_len'] if j['mode'] != 'orig' else '', cfgall['gate']['init_bias'] if rg else '',
+                          cfgall['gate']['lr_mult'] if rg else ''])
     print(f'{len(jobs)} jobs frozen in {run}/protocol.json (orig reused: {bool(orig_dir)})')
 
 
@@ -93,7 +95,8 @@ def worker(run, ds, h, mode, seed):
     for f, s in P['code_sha256'].items():
         assert sha(REPO / f) == s, f'code changed since --init: {f}'
     j = next(x for x in P['jobs'] if x['dataset'] == ds and x['horizon'] == h and x['mode'] == mode and x['seed'] == seed)
-    cfg = {k: j[k] for k in ('learning_rate', 'd_model', 'kernel_size')}
+    assert sha(P['config_file']) == P['config_sha256'], 'pilot config changed since --init'
+    cfg = j['config']
     path = jdir(run, j)
     T.setup_cuda()
     s = Series(ds, load_audit(P['audit']), P['data_dir'])
@@ -113,7 +116,8 @@ def collect(run, P):
         r = read(jdir(run, j) / 'result.json')
         g = r.get('gates') or {}
         rows.append(dict(dataset=j['dataset'], horizon=j['horizon'], mode=j['mode'], seed=j['seed'],
-                         lr=j['learning_rate'], d_model=j['d_model'], cycle_len=j['cycle_len'],
+                         lr=j['config']['learning_rate'], d_model=j['config']['d_model'],
+                         batch_size=j['config'].get('batch_size', 32), cycle_len=j['cycle_len'],
                          best_epoch=r['best_epoch'], epochs_ran=r['epochs_ran'], val_mse=r['best_val_mse'],
                          test_mse=r['test']['mse'], test_mae=r['test']['mae'],
                          extra_params=r['extra_parameters']['total'], Q_rms=g.get('Q_rms'),
@@ -151,7 +155,10 @@ def group_summary(run, P, ds, h):
     om, refs = np.mean(orig_mse), P['refs']
     itr = refs['iTransformer_paper'].get(key)
     cyc = refs['CycleNet_Table4_iTransformer_plus_RCF'].get(key)
-    out = dict(dataset=ds, horizon=h, orig=dict(source=orig_src, mse=_stats(orig_mse), mae=_stats(orig_mae)),
+    out = dict(dataset=ds, horizon=h, orig=dict(source=orig_src, mse=_stats(orig_mse), mae=_stats(orig_mae),
+                                                vs_iTransformer_paper_pct=float(100 * (om / itr['mse'] - 1)) if itr else None,
+                                                best_epoch=[r['best_epoch'] for r in res['orig']],
+                                                elapsed_s=[round(r['elapsed_seconds']) for r in res['orig']]),
                refs=dict(iTransformer_paper=itr, CycleNet_iTr_RCF_paper=cyc), modes={})
     for m in ('rcf', 'rg'):
         rr = res[m]
@@ -165,6 +172,7 @@ def group_summary(run, P, ds, h):
                  vs_orig_mae_pct=float(100 * (mae.mean() / np.mean(orig_mae) - 1)),
                  seeds_beating_orig=f'{sum(paired)}/{len(rr)}',
                  vs_iTransformer_paper_pct=float(100 * (mse.mean() / itr['mse'] - 1)) if itr else None,
+                 vs_CycleNet_iTr_RCF_paper_pct=float(100 * (mse.mean() / cyc['mse'] - 1)) if cyc else None,
                  best_epoch=[r['best_epoch'] for r in rr], extra_parameters=rr[0]['extra_parameters'],
                  elapsed_s=[round(r['elapsed_seconds']) for r in rr])
         gs = [r['gates'] for r in rr if r.get('gates')]
@@ -261,7 +269,7 @@ if __name__ == '__main__':
     ap.add_argument('--data-dir')
     ap.add_argument('--audit')
     ap.add_argument('--orig-dir')
-    ap.add_argument('--config', default=str(REPO / 'configs' / 'pilot_day1.json'))
+    ap.add_argument('--config', default=str(REPO / 'configs' / 'pilot_day1_cyclenet.json'))
     ap.add_argument('--worker', action='store_true')
     ap.add_argument('--dataset')
     ap.add_argument('--horizon', type=int)

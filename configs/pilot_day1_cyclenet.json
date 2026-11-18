@@ -1,0 +1,237 @@
+{
+  "name": "rgcycle_day1_cyclenet_protocol",
+  "description": "Day-1 pilot under the CycleNet (NeurIPS 2024) iTransformer / CycleiTransformer protocol: orig (iTransformer) vs +RCF (CycleiTransformer) vs +RG-Cycle, same recipe for all three.",
+  "seq_len": 96,
+  "seeds": [
+    2026,
+    2027,
+    2028
+  ],
+  "modes": [
+    "orig",
+    "rcf",
+    "rg"
+  ],
+  "orig_mode": "train",
+  "workers": 2,
+  "gate": {
+    "init_bias": -2.0,
+    "lr_mult": 10.0,
+    "note": "RG-only additions; gate parameters get 10x the epoch lr of the CycleNet schedule (own Adam group)."
+  },
+  "cycle_len": {
+    "ETTh1": 24,
+    "Electricity": 168,
+    "Traffic": 168
+  },
+  "cycle_len_source": "ACAT-SCUT/CycleNet@d807e51 scripts/iTransformer/traffic.sh:25, scripts/iTransformer/electricity.sh:25 (168); scripts/CycleNet/Linear-Input-96/etth1.sh:26 (24)",
+  "common_sources": {
+    "seq_len": "ACAT-SCUT/CycleNet@d807e51 run.py:31 (default 96) and scripts/iTransformer/*.sh:9 seq_len=96",
+    "n_heads": "ACAT-SCUT/CycleNet@d807e51 run.py:71 (default 8; not set in scripts)",
+    "activation": "ACAT-SCUT/CycleNet@d807e51 run.py:83 (default gelu)",
+    "use_revin": "ACAT-SCUT/CycleNet@d807e51 run.py:38 (default 1) -> models/CycleiTransformer.py:28 use_norm",
+    "loss": "ACAT-SCUT/CycleNet@d807e51 exp/exp_main.py:60 nn.MSELoss()",
+    "optimizer": "ACAT-SCUT/CycleNet@d807e51 exp/exp_main.py:56 optim.Adam(lr) (betas .9/.999, no weight decay)",
+    "lradj": "ACAT-SCUT/CycleNet@d807e51 run.py:96 (default type3; scripts do not set it) -> utils/tools.py:18; OneCycleLR constructed at exp/exp_main.py:135 sets epoch-1 lr to lr/25; adjust_learning_rate after each epoch at exp/exp_main.py:234-235",
+    "early_stopping": "ACAT-SCUT/CycleNet@d807e51 utils/tools.py EarlyStopping (strict improvement, delta 0); exp/exp_main.py:127,229-232",
+    "train_loader": "ACAT-SCUT/CycleNet@d807e51 data_provider/data_factory.py:31-32 shuffle=True, drop_last=True",
+    "val_loader": "ACAT-SCUT/CycleNet@d807e51 data_provider/data_factory.py:31-32 (val uses the same branch) shuffle=True, drop_last=True; exp/exp_main.py vali(): np.average of per-batch MSE",
+    "test_loader": "ACAT-SCUT/CycleNet@d807e51 data_provider/data_factory.py:20-21 shuffle=False, drop_last=False (all test windows); metric = element-wise mean over all windows (utils/metrics.py)",
+    "split_ETTh1": "ACAT-SCUT/CycleNet@d807e51 data_provider/data_loader.py:49 12/4/4 months (8640/2880/2880 rows), StandardScaler fit on train rows",
+    "split_custom": "ACAT-SCUT/CycleNet@d807e51 data_provider/data_loader.py:247-248 70/10/20 with int(), StandardScaler fit on train rows",
+    "cycle_index": "ACAT-SCUT/CycleNet@d807e51 data_provider/data_loader.py:84,97 cycle_index[s_end] with np.arange(len(data)) % cycle",
+    "factor": "unused by FullAttention (no masking, mask_flag False)",
+    "time_tokens": "ACAT-SCUT/CycleNet@d807e51 exp/exp_main.py model(batch_x, batch_cycle): x_mark_enc=None, no timestamp tokens"
+  },
+  "cyclenet_code_behaviour": {
+    "test_drop_last": "False (data_factory.py:20-21): every test window is evaluated, so no deviation is needed here. Note the official iTransformer repo uses drop_last=True for test (thuml/iTransformer data_provider/data_factory.py:20-22); the iTransformer rows of CycleNet Table 4 are the iTransformer paper numbers.",
+    "determinism": "CycleNet seeds random/numpy/torch (run.py:110-113) but does not enable deterministic algorithms; TF32 left at PyTorch defaults (matmul off, cuDNN conv on).",
+    "per_epoch_test_eval": "CycleNet also evaluates the test set every epoch for logging only (exp_main.py:225); not repeated here."
+  },
+  "groups": [
+    {
+      "dataset": "ETTh1",
+      "horizon": 96,
+      "config": {
+        "backbone": "cyclenet_itransformer",
+        "recipe": "cyclenet",
+        "e_layers": 2,
+        "d_model": 256,
+        "d_ff": 256,
+        "dropout": 0.1,
+        "batch_size": 32,
+        "learning_rate": 0.0001,
+        "train_epochs": 10,
+        "patience": 3,
+        "n_heads": 8,
+        "activation": "gelu",
+        "use_revin": 1
+      },
+      "source": {
+        "architecture": "thuml/iTransformer@c2426e6 scripts/multivariate_forecasting/ETT/iTransformer_ETTh1.sh: e_layers:15 d_model:20 d_ff:21",
+        "batch_size/learning_rate/train_epochs/patience/dropout": "thuml/iTransformer@c2426e6 run.py defaults: batch_size:63 (32) learning_rate:65 (1e-4) train_epochs:62 (10) patience:64 (3) dropout:52 (0.1)",
+        "cycle": "ACAT-SCUT/CycleNet@d807e51 scripts/CycleNet/Linear-Input-96/etth1.sh:26",
+        "note": "CycleNet has no iTransformer/CycleiTransformer run on ETTh1 (Table 4 covers Electricity and Traffic only). The ETTh1 iTransformer script values are used inside the CycleNet training framework, the same way CycleNet ported the official iTransformer electricity/traffic scripts."
+      }
+    },
+    {
+      "dataset": "ETTh1",
+      "horizon": 720,
+      "config": {
+        "backbone": "cyclenet_itransformer",
+        "recipe": "cyclenet",
+        "e_layers": 2,
+        "d_model": 512,
+        "d_ff": 512,
+        "dropout": 0.1,
+        "batch_size": 32,
+        "learning_rate": 0.0001,
+        "train_epochs": 10,
+        "patience": 3,
+        "n_heads": 8,
+        "activation": "gelu",
+        "use_revin": 1
+      },
+      "source": {
+        "architecture": "thuml/iTransformer@c2426e6 scripts/multivariate_forecasting/ETT/iTransformer_ETTh1.sh (pred_len 720 block, line 71): e_layers:72 d_model:77 d_ff:78",
+        "batch_size/learning_rate/train_epochs/patience/dropout": "thuml/iTransformer@c2426e6 run.py defaults: batch_size:63 (32) learning_rate:65 (1e-4) train_epochs:62 (10) patience:64 (3) dropout:52 (0.1)",
+        "cycle": "ACAT-SCUT/CycleNet@d807e51 scripts/CycleNet/Linear-Input-96/etth1.sh:26",
+        "note": "see ETTh1 H96"
+      }
+    },
+    {
+      "dataset": "Electricity",
+      "horizon": 96,
+      "config": {
+        "backbone": "cyclenet_itransformer",
+        "recipe": "cyclenet",
+        "e_layers": 3,
+        "d_model": 512,
+        "d_ff": 512,
+        "dropout": 0.1,
+        "batch_size": 16,
+        "learning_rate": 0.0005,
+        "train_epochs": 10,
+        "patience": 3,
+        "n_heads": 8,
+        "activation": "gelu",
+        "use_revin": 1
+      },
+      "source": {
+        "all": "ACAT-SCUT/CycleNet@d807e51 scripts/iTransformer/electricity.sh: d_model:26 d_ff:27 dropout:28 e_layers:29 train_epochs:30 patience:31 batch_size/learning_rate:32 cycle:25"
+      }
+    },
+    {
+      "dataset": "Electricity",
+      "horizon": 720,
+      "config": {
+        "backbone": "cyclenet_itransformer",
+        "recipe": "cyclenet",
+        "e_layers": 3,
+        "d_model": 512,
+        "d_ff": 512,
+        "dropout": 0.1,
+        "batch_size": 16,
+        "learning_rate": 0.0005,
+        "train_epochs": 10,
+        "patience": 3,
+        "n_heads": 8,
+        "activation": "gelu",
+        "use_revin": 1
+      },
+      "source": {
+        "all": "ACAT-SCUT/CycleNet@d807e51 scripts/iTransformer/electricity.sh: d_model:26 d_ff:27 dropout:28 e_layers:29 train_epochs:30 patience:31 batch_size/learning_rate:32 cycle:25"
+      }
+    },
+    {
+      "dataset": "Traffic",
+      "horizon": 96,
+      "config": {
+        "backbone": "cyclenet_itransformer",
+        "recipe": "cyclenet",
+        "e_layers": 4,
+        "d_model": 512,
+        "d_ff": 512,
+        "dropout": 0.1,
+        "batch_size": 16,
+        "learning_rate": 0.001,
+        "train_epochs": 30,
+        "patience": 5,
+        "n_heads": 8,
+        "activation": "gelu",
+        "use_revin": 1
+      },
+      "source": {
+        "all": "ACAT-SCUT/CycleNet@d807e51 scripts/iTransformer/traffic.sh: d_model:26 d_ff:27 e_layers:28 dropout:29 train_epochs:30 patience:31 batch_size/learning_rate:32 cycle:25"
+      }
+    },
+    {
+      "dataset": "Traffic",
+      "horizon": 720,
+      "config": {
+        "backbone": "cyclenet_itransformer",
+        "recipe": "cyclenet",
+        "e_layers": 4,
+        "d_model": 512,
+        "d_ff": 512,
+        "dropout": 0.1,
+        "batch_size": 16,
+        "learning_rate": 0.001,
+        "train_epochs": 30,
+        "patience": 5,
+        "n_heads": 8,
+        "activation": "gelu",
+        "use_revin": 1
+      },
+      "source": {
+        "all": "ACAT-SCUT/CycleNet@d807e51 scripts/iTransformer/traffic.sh: d_model:26 d_ff:27 e_layers:28 dropout:29 train_epochs:30 patience:31 batch_size/learning_rate:32 cycle:25"
+      }
+    }
+  ],
+  "refs": {
+    "iTransformer_paper": {
+      "ETTh1/H96": {
+        "mse": 0.386,
+        "mae": 0.405
+      },
+      "ETTh1/H720": {
+        "mse": 0.503,
+        "mae": 0.491
+      },
+      "Electricity/H96": {
+        "mse": 0.148,
+        "mae": 0.24
+      },
+      "Electricity/H720": {
+        "mse": 0.225,
+        "mae": 0.317
+      },
+      "Traffic/H96": {
+        "mse": 0.395,
+        "mae": 0.268
+      },
+      "Traffic/H720": {
+        "mse": 0.467,
+        "mae": 0.302
+      }
+    },
+    "CycleNet_Table4_iTransformer_plus_RCF": {
+      "Electricity/H96": {
+        "mse": 0.136,
+        "mae": 0.231
+      },
+      "Electricity/H720": {
+        "mse": 0.194,
+        "mae": 0.287
+      },
+      "Traffic/H96": {
+        "mse": 0.415,
+        "mae": 0.263
+      },
+      "Traffic/H720": {
+        "mse": 0.491,
+        "mae": 0.294
+      }
+    }
+  }
+}

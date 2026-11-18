@@ -93,3 +93,112 @@ class ITransformer(nn.Module):
 
     def forward(self, x, index=None):
         return self.revin(self.forward_normalized(self.revin(x, 'norm')), 'denorm')
+
+
+# ---------------------------------------------------------------------------------------------------------
+# iTransformer exactly as used in the CycleNet repository (models/CycleiTransformer.py with layers/Embed.py,
+# layers/Transformer_EncDec.py, layers/SelfAttention_Family.py; github.com/ACAT-SCUT/CycleNet @ d807e51,
+# Apache-2.0, see THIRD_PARTY_NOTICES.md). Same modules, creation order (hence same initial random draws),
+# normalisation arithmetic and forward pass; x_mark_enc is None as in CycleNet's exp_main (no timestamp tokens).
+# The RecurrentCycle is not part of this class: it is added by rgcycle.cycle.CycleForecaster.
+# ---------------------------------------------------------------------------------------------------------
+class CycleNetNorm(nn.Module):
+    """Normalisation from Non-stationary Transformer, as written in CycleiTransformer.forecast."""
+
+    def forward(self, x, mode):
+        if mode == 'norm':
+            self.means = x.mean(1, keepdim=True).detach()
+            x = x - self.means
+            self.stdev = torch.sqrt(torch.var(x, dim=1, keepdim=True, unbiased=False) + 1e-5)
+            return x / self.stdev
+        if mode == 'denorm':
+            h = x.shape[1]
+            x = x * (self.stdev[:, 0, :].unsqueeze(1).repeat(1, h, 1))
+            return x + (self.means[:, 0, :].unsqueeze(1).repeat(1, h, 1))
+        raise ValueError(mode)
+
+
+class _Identity(nn.Module):
+    def forward(self, x, mode):
+        return x
+
+
+class FullAttention(nn.Module):
+    def __init__(self, attention_dropout=0.1):
+        super().__init__()
+        self.dropout = nn.Dropout(attention_dropout)
+
+    def forward(self, queries, keys, values):
+        B, L, H, E = queries.shape
+        scale = 1. / math.sqrt(E)
+        scores = torch.einsum('blhe,bshe->bhls', queries, keys)
+        A = self.dropout(torch.softmax(scale * scores, dim=-1))
+        return torch.einsum('bhls,bshd->blhd', A, values).contiguous()
+
+
+class AttentionLayer(nn.Module):
+    def __init__(self, attention, d_model, n_heads):
+        super().__init__()
+        d_keys = d_model // n_heads
+        self.inner_attention = attention
+        self.query_projection = nn.Linear(d_model, d_keys * n_heads)
+        self.key_projection = nn.Linear(d_model, d_keys * n_heads)
+        self.value_projection = nn.Linear(d_model, d_keys * n_heads)
+        self.out_projection = nn.Linear(d_keys * n_heads, d_model)
+        self.n_heads = n_heads
+
+    def forward(self, x):
+        B, L, _ = x.shape
+        H = self.n_heads
+        q = self.query_projection(x).view(B, L, H, -1)
+        k = self.key_projection(x).view(B, L, H, -1)
+        v = self.value_projection(x).view(B, L, H, -1)
+        return self.out_projection(self.inner_attention(q, k, v).view(B, L, -1))
+
+
+class CNEncoderLayer(nn.Module):
+    def __init__(self, attention, d_model, d_ff, dropout=0.1, activation='gelu'):
+        super().__init__()
+        self.attention = attention
+        self.conv1 = nn.Conv1d(in_channels=d_model, out_channels=d_ff, kernel_size=1)
+        self.conv2 = nn.Conv1d(in_channels=d_ff, out_channels=d_model, kernel_size=1)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.dropout = nn.Dropout(dropout)
+        self.activation = torch.nn.functional.relu if activation == 'relu' else torch.nn.functional.gelu
+
+    def forward(self, x):
+        x = x + self.dropout(self.attention(x))
+        y = x = self.norm1(x)
+        y = self.dropout(self.activation(self.conv1(y.transpose(-1, 1))))
+        y = self.dropout(self.conv2(y).transpose(-1, 1))
+        return self.norm2(x + y)
+
+
+class CycleNetITransformer(nn.Module):
+    """CycleNet's iTransformer (CycleiTransformer without the cycle). (B, L, C) -> (B, H, C)."""
+
+    def __init__(self, c_in, seq_len=96, pred_len=96, d_model=512, n_heads=8, e_layers=2, d_ff=2048,
+                 dropout=0.1, activation='gelu', use_revin=True):
+        super().__init__()
+        self.c_in, self.seq_len, self.pred_len = c_in, seq_len, pred_len
+        # DataEmbedding_inverted
+        self.value_embedding = nn.Linear(seq_len, d_model)
+        self.emb_dropout = nn.Dropout(p=dropout)
+        self.attn_layers = nn.ModuleList([
+            CNEncoderLayer(AttentionLayer(FullAttention(attention_dropout=dropout), d_model, n_heads),
+                           d_model, d_ff, dropout=dropout, activation=activation) for _ in range(e_layers)])
+        self.norm = nn.LayerNorm(d_model)
+        self.projector = nn.Linear(d_model, pred_len, bias=True)
+        self.revin = CycleNetNorm() if use_revin else _Identity()
+
+    def forward_normalized(self, xn):
+        n = xn.shape[2]
+        h = self.emb_dropout(self.value_embedding(xn.permute(0, 2, 1)))
+        for layer in self.attn_layers:
+            h = layer(h)
+        h = self.norm(h)
+        return self.projector(h).permute(0, 2, 1)[:, :, :n]
+
+    def forward(self, x, index=None):
+        return self.revin(self.forward_normalized(self.revin(x, 'norm')), 'denorm')

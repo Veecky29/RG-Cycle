@@ -1,7 +1,8 @@
 """Train a single job.
 
-    python train.py --dataset Traffic --horizon 96 --mode rg --seed 2026 \
-        --lr 0.001 --d-model 256 --kernel-size 5 --cycle 168 --data-dir data/benchmark --out outputs/run
+    # take all hyper-parameters from a pilot config group
+    python train.py --config configs/pilot_day1_cyclenet.json --dataset Traffic --horizon 96 --mode rg --seed 2026 \
+        --out outputs/traffic_h96_rg_s2026
 """
 import argparse
 import json
@@ -15,31 +16,27 @@ ROOT = Path(__file__).resolve().parent
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument('--config', type=Path, default=ROOT / 'configs' / 'pilot_day1_cyclenet.json')
     p.add_argument('--dataset', required=True)
     p.add_argument('--horizon', type=int, required=True)
     p.add_argument('--mode', choices=['orig', 'rcf', 'rg'], required=True)
     p.add_argument('--seed', type=int, default=2026)
-    p.add_argument('--lr', type=float, required=True)
-    p.add_argument('--d-model', type=int, required=True)
-    p.add_argument('--kernel-size', type=int, default=None, help='only reproduces PAC-Former random-draw order')
-    p.add_argument('--cycle', type=int, default=None, help='cycle length W (needed for rcf/rg)')
-    p.add_argument('--gate-init-bias', type=float, default=-2.0)
-    p.add_argument('--gate-lr-mult', type=float, default=10.0)
+    p.add_argument('--cycle', type=int, default=None, help='override cycle length W')
     p.add_argument('--max-epochs', type=int, default=T.MAX_EPOCHS)
     p.add_argument('--data-dir', type=Path, default=ROOT / 'data' / 'benchmark')
     p.add_argument('--audit', type=Path, default=ROOT / 'configs' / 'datasets.json')
     p.add_argument('--out', type=Path, required=True)
     a = p.parse_args()
-    if a.mode != 'orig' and a.cycle is None:
-        p.error('--cycle is required for rcf/rg')
+    P = json.loads(a.config.read_text())
+    g = next((x for x in P['groups'] if x['dataset'] == a.dataset and x['horizon'] == a.horizon), None)
+    if g is None:
+        p.error(f'{a.dataset} H{a.horizon} not in {a.config}')
+    cycle = a.cycle or P['cycle_len'][a.dataset]
     T.setup_cuda()
-    cfg = dict(learning_rate=a.lr, d_model=a.d_model)
-    if a.kernel_size is not None:
-        cfg['kernel_size'] = a.kernel_size
     s = Series(a.dataset, load_audit(a.audit), a.data_dir)
     try:
-        r = T.fit_job(s, a.horizon, cfg, a.seed, a.out, a.mode, a.cycle, a.gate_init_bias, a.gate_lr_mult,
-                      max_epochs=a.max_epochs)
+        r = T.fit_job(s, a.horizon, g['config'], a.seed, a.out, a.mode, cycle, P['gate']['init_bias'],
+                      P['gate']['lr_mult'], max_epochs=a.max_epochs)
     finally:
         s.close()
     print(json.dumps(dict(test=r['test'], best_epoch=r['best_epoch'], gates=r['gates']), indent=2))
