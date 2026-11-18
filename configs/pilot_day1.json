@@ -1,0 +1,32 @@
+{
+  "name": "rgcycle_day1_itransformer",
+  "description": "Day-1 pilot: iTransformer backbone (PAC-Former variant B) vs +RCF (CycleNet) vs +RG-Cycle.",
+  "seq_len": 96,
+  "seeds": [2026, 2027, 2028],
+  "modes": ["rcf", "rg"],
+  "orig_mode": "reuse",
+  "workers": 2,
+  "gate": {"init_bias": -2.0, "lr_mult": 10.0},
+  "cycle_len": {"ETTh1": 24, "Electricity": 168, "Traffic": 168},
+  "cycle_len_source": "CycleNet official scripts: scripts/CycleNet/*/etth1.sh --cycle 24; electricity.sh / traffic.sh and scripts/iTransformer/*.sh --cycle 168",
+  "groups": [
+    {"dataset": "ETTh1", "horizon": 96, "config": {"learning_rate": 0.0001, "d_model": 256, "kernel_size": 7}},
+    {"dataset": "ETTh1", "horizon": 720, "config": {"learning_rate": 0.0001, "d_model": 128, "kernel_size": 5}},
+    {"dataset": "Electricity", "horizon": 96, "config": {"learning_rate": 0.001, "d_model": 256, "kernel_size": 7}},
+    {"dataset": "Electricity", "horizon": 720, "config": {"learning_rate": 0.001, "d_model": 256, "kernel_size": 5}},
+    {"dataset": "Traffic", "horizon": 96, "config": {"learning_rate": 0.001, "d_model": 256, "kernel_size": 5}},
+    {"dataset": "Traffic", "horizon": 720, "config": {"learning_rate": 0.001, "d_model": 256, "kernel_size": 5}}
+  ],
+  "config_note": "learning_rate and d_model per dataset/H from the PAC-Former Table 5 selection (shared by all ablation variants incl. B). kernel_size is not used by the backbone; it only reproduces the random-draw order of the original B runs.",
+  "refs": {
+    "iTransformer_paper": {
+      "ETTh1/H96": {"mse": 0.386, "mae": 0.405}, "ETTh1/H720": {"mse": 0.503, "mae": 0.491},
+      "Electricity/H96": {"mse": 0.148, "mae": 0.240}, "Electricity/H720": {"mse": 0.225, "mae": 0.317},
+      "Traffic/H96": {"mse": 0.395, "mae": 0.268}, "Traffic/H720": {"mse": 0.467, "mae": 0.302}
+    },
+    "CycleNet_Table4_iTransformer_plus_RCF": {
+      "Electricity/H96": {"mse": 0.136, "mae": 0.231}, "Electricity/H720": {"mse": 0.194, "mae": 0.287},
+      "Traffic/H96": {"mse": 0.415, "mae": 0.263}, "Traffic/H720": {"mse": 0.491, "mae": 0.294}
+    }
+  }
+}

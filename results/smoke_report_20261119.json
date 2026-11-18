@@ -1,0 +1,403 @@
+{
+  "checks": {
+    "ETTh1/H96": {
+      "shape": [
+        8,
+        96,
+        7
+      ],
+      "target_shape": [
+        8,
+        96,
+        7
+      ],
+      "rcf_equals_orig": true,
+      "rg_equals_orig": true,
+      "extra_params": {
+        "orig": {
+          "cycle": 0,
+          "gate": 0,
+          "total": 0
+        },
+        "rcf": {
+          "cycle": 168,
+          "gate": 0,
+          "total": 168
+        },
+        "rg": {
+          "cycle": 168,
+          "gate": 210,
+          "total": 378
+        }
+      },
+      "backbone_params": 1103712,
+      "backbone_weights_identical_to_PACFormer_B": true,
+      "output_identical_to_PACFormer_B": true
+    },
+    "ETTh1/H720": {
+      "shape": [
+        8,
+        720,
+        7
+      ],
+      "target_shape": [
+        8,
+        720,
+        7
+      ],
+      "rcf_equals_orig": true,
+      "rg_equals_orig": true,
+      "extra_params": {
+        "orig": {
+          "cycle": 0,
+          "gate": 0,
+          "total": 0
+        },
+        "rcf": {
+          "cycle": 168,
+          "gate": 0,
+          "total": 168
+        },
+        "rg": {
+          "cycle": 168,
+          "gate": 1458,
+          "total": 1626
+        }
+      },
+      "backbone_params": 370256,
+      "backbone_weights_identical_to_PACFormer_B": true,
+      "output_identical_to_PACFormer_B": true
+    },
+    "Electricity/H96": {
+      "shape": [
+        8,
+        96,
+        321
+      ],
+      "target_shape": [
+        8,
+        96,
+        321
+      ],
+      "rcf_equals_orig": true,
+      "rg_equals_orig": true,
+      "extra_params": {
+        "orig": {
+          "cycle": 0,
+          "gate": 0,
+          "total": 0
+        },
+        "rcf": {
+          "cycle": 53928,
+          "gate": 0,
+          "total": 53928
+        },
+        "rg": {
+          "cycle": 53928,
+          "gate": 838,
+          "total": 54766
+        }
+      },
+      "backbone_params": 1103712,
+      "backbone_weights_identical_to_PACFormer_B": true,
+      "output_identical_to_PACFormer_B": true
+    },
+    "Electricity/H720": {
+      "shape": [
+        8,
+        720,
+        321
+      ],
+      "target_shape": [
+        8,
+        720,
+        321
+      ],
+      "rcf_equals_orig": true,
+      "rg_equals_orig": true,
+      "extra_params": {
+        "orig": {
+          "cycle": 0,
+          "gate": 0,
+          "total": 0
+        },
+        "rcf": {
+          "cycle": 53928,
+          "gate": 0,
+          "total": 53928
+        },
+        "rg": {
+          "cycle": 53928,
+          "gate": 2086,
+          "total": 56014
+        }
+      },
+      "backbone_params": 1264080,
+      "backbone_weights_identical_to_PACFormer_B": true,
+      "output_identical_to_PACFormer_B": true
+    },
+    "Traffic/H96": {
+      "shape": [
+        8,
+        96,
+        862
+      ],
+      "target_shape": [
+        8,
+        96,
+        862
+      ],
+      "rcf_equals_orig": true,
+      "rg_equals_orig": true,
+      "extra_params": {
+        "orig": {
+          "cycle": 0,
+          "gate": 0,
+          "total": 0
+        },
+        "rcf": {
+          "cycle": 144816,
+          "gate": 0,
+          "total": 144816
+        },
+        "rg": {
+          "cycle": 144816,
+          "gate": 1920,
+          "total": 146736
+        }
+      },
+      "backbone_params": 1103712,
+      "backbone_weights_identical_to_PACFormer_B": true,
+      "output_identical_to_PACFormer_B": true
+    },
+    "Traffic/H720": {
+      "shape": [
+        8,
+        720,
+        862
+      ],
+      "target_shape": [
+        8,
+        720,
+        862
+      ],
+      "rcf_equals_orig": true,
+      "rg_equals_orig": true,
+      "extra_params": {
+        "orig": {
+          "cycle": 0,
+          "gate": 0,
+          "total": 0
+        },
+        "rcf": {
+          "cycle": 144816,
+          "gate": 0,
+          "total": 144816
+        },
+        "rg": {
+          "cycle": 144816,
+          "gate": 3168,
+          "total": 147984
+        }
+      },
+      "backbone_params": 1264080,
+      "backbone_weights_identical_to_PACFormer_B": true,
+      "output_identical_to_PACFormer_B": true
+    }
+  },
+  "determinism_2epochs_ETTh1_H96": {
+    "rcf": {
+      "bitwise_identical_reruns": true,
+      "run": {
+        "val": [
+          0.731672297229943,
+          0.6953103168236061
+        ],
+        "train": [
+          0.4709644982534828,
+          0.3668301753474004
+        ],
+        "test_mse": 0.38579622977377404,
+        "test_mae": 0.40185339164775674,
+        "gates": {
+          "Q_rms": 0.014840182848274708,
+          "Q_absmax": 0.03809864819049835
+        },
+        "sec_per_epoch": [
+          10.55,
+          10.49
+        ]
+      }
+    },
+    "rg": {
+      "bitwise_identical_reruns": true,
+      "run": {
+        "val": [
+          0.731939423087189,
+          0.6951406106720027
+        ],
+        "train": [
+          0.47126556605552183,
+          0.3671576205753919
+        ],
+        "test_mse": 0.38582218313339445,
+        "test_mae": 0.40189930278312724,
+        "gates": {
+          "Q_rms": 0.02235434204339981,
+          "Q_absmax": 0.049621205776929855,
+          "split": "test",
+          "pairs": 19495,
+          "mean_R2": 0.014068410502974575,
+          "mean_rho": 0.34978776329584405,
+          "mean_g_in": 0.06524732274106754,
+          "mean_g_out": 0.36580510816681044,
+          "mean_g_out_by_horizon_bucket": {
+            "1-24": 0.36776291726064236,
+            "25-48": 0.36289262918952403,
+            "49-72": 0.3666616711307232,
+            "73-96": 0.365903215086352
+          },
+          "corr_g_in_R2": -0.9153720096240492,
+          "corr_g_out_R2": 0.9492608748535141,
+          "gate_params": {
+            "a_in": [
+              -0.6496140956878662,
+              -0.575319230556488
+            ],
+            "a_out": [
+              0.8353924751281738,
+              0.6545012593269348
+            ],
+            "eta_first_last": [
+              0.5857424139976501,
+              0.5547675490379333
+            ],
+            "kappa_first_last": [
+              0.2719782292842865,
+              0.28648146986961365
+            ]
+          }
+        },
+        "sec_per_epoch": [
+          11.84,
+          11.66
+        ]
+      }
+    }
+  },
+  "orig_rerun_vs_existing_B": {
+    "H96": {
+      "new": {
+        "test": {
+          "mse": 0.3837097678337052,
+          "mae": 0.40175280895407806,
+          "windows": 2785,
+          "elements": 1871520
+        },
+        "best_val_mse": 0.688177121439519,
+        "best_epoch": 4,
+        "epochs_ran": 9
+      },
+      "old": {
+        "test": {
+          "mse": 0.3837097678337052,
+          "mae": 0.40175280895407806,
+          "windows": 2785,
+          "elements": 1871520,
+          "last_batch_windows": 1
+        },
+        "best_val_mse": 0.688177121439519,
+        "best_epoch": 4
+      },
+      "bitwise_identical": true
+    },
+    "H720": {
+      "new": {
+        "test": {
+          "mse": 0.48239791074489835,
+          "mae": 0.47923788651681787,
+          "windows": 2161,
+          "elements": 10891440
+        },
+        "best_val_mse": 1.5749673132343722,
+        "best_epoch": 3,
+        "epochs_ran": 8
+      },
+      "old": {
+        "test": {
+          "mse": 0.48239791074489835,
+          "mae": 0.47923788651681787,
+          "windows": 2161,
+          "elements": 10891440,
+          "last_batch_windows": 17
+        },
+        "best_val_mse": 1.5749673132343722,
+        "best_epoch": 3
+      },
+      "bitwise_identical": true
+    }
+  },
+  "timing_single_process": {
+    "Electricity/H96/orig": {
+      "ms_per_step": 36.68,
+      "steps_per_epoch": 569,
+      "train_s_per_epoch": 20.9
+    },
+    "Electricity/H96/rcf": {
+      "ms_per_step": 39.06,
+      "steps_per_epoch": 569,
+      "train_s_per_epoch": 22.2
+    },
+    "Electricity/H96/rg": {
+      "ms_per_step": 43.13,
+      "steps_per_epoch": 569,
+      "train_s_per_epoch": 24.5
+    },
+    "Electricity/H720/orig": {
+      "ms_per_step": 36.44,
+      "steps_per_epoch": 549,
+      "train_s_per_epoch": 20.0
+    },
+    "Electricity/H720/rcf": {
+      "ms_per_step": 37.2,
+      "steps_per_epoch": 549,
+      "train_s_per_epoch": 20.4
+    },
+    "Electricity/H720/rg": {
+      "ms_per_step": 42.71,
+      "steps_per_epoch": 549,
+      "train_s_per_epoch": 23.4
+    },
+    "Traffic/H96/orig": {
+      "ms_per_step": 54.76,
+      "steps_per_epoch": 377,
+      "train_s_per_epoch": 20.6
+    },
+    "Traffic/H96/rcf": {
+      "ms_per_step": 55.01,
+      "steps_per_epoch": 377,
+      "train_s_per_epoch": 20.7
+    },
+    "Traffic/H96/rg": {
+      "ms_per_step": 55.72,
+      "steps_per_epoch": 377,
+      "train_s_per_epoch": 21.0
+    },
+    "Traffic/H720/orig": {
+      "ms_per_step": 56.85,
+      "steps_per_epoch": 358,
+      "train_s_per_epoch": 20.4
+    },
+    "Traffic/H720/rcf": {
+      "ms_per_step": 57.67,
+      "steps_per_epoch": 358,
+      "train_s_per_epoch": 20.6
+    },
+    "Traffic/H720/rg": {
+      "ms_per_step": 59.92,
+      "steps_per_epoch": 358,
+      "train_s_per_epoch": 21.5
+    }
+  },
+  "SMOKE_OK": true
+}

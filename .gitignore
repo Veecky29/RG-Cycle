@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+outputs/
+runs/
+data/benchmark/
+*.csv.download
+*.pt
+*.pth
+*.ckpt
+.ipynb_checkpoints/
+.DS_Store
