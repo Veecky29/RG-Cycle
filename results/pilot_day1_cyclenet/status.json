@@ -1,0 +1,31 @@
+{
+  "state": "running",
+  "completed": 35,
+  "total": 54,
+  "active": [
+    {
+      "dataset": "Electricity",
+      "horizon": 720,
+      "mode": "rg",
+      "seed": 2027,
+      "pid": 85432,
+      "epoch": 8,
+      "val_mse": 0.18385308818155977,
+      "best_val_mse": 0.1831600004885377,
+      "utc": "2026-11-18T19:10:16.492055+00:00"
+    },
+    {
+      "dataset": "Traffic",
+      "horizon": 96,
+      "mode": "orig",
+      "seed": 2026,
+      "pid": 85558,
+      "epoch": 1,
+      "val_mse": 0.4587455715947938,
+      "best_val_mse": 0.4587455715947938,
+      "utc": "2026-11-18T19:09:24.536687+00:00"
+    }
+  ],
+  "elapsed_s": 5390,
+  "utc": "2026-11-18T19:10:35Z"
+}

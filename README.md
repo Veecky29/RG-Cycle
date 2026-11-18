@@ -89,6 +89,7 @@ pilot/smoke_test_cyclenet.py  GPU smoke test (official-code equivalence, determi
 pilot/smoke_test.py    GPU smoke test for the PAC-Former-recipe variant
 tests/test_rgcycle.py  CPU unit tests
 results/smoke_report_20261119.json  GPU smoke test on RTX 4090 (19 Nov 2026)
+results/pilot_day1_cyclenet/        day-1 pilot snapshot: protocol, jobs, per-seed metrics, group summaries
 ```
 
 ## Usage
@@ -105,6 +106,14 @@ python train.py --config configs/pilot_day1_cyclenet.json --dataset Traffic --ho
 python pilot/run_pilot.py --run-dir RUN --init --data-dir data/benchmark --audit configs/datasets.json
 bash pilot/launch.sh RUN python
 ```
+
+## Results
+
+第一天试点（CycleNet 论文设定）的部分结果在 [`results/pilot_day1_cyclenet/`](results/pilot_day1_cyclenet/README.md)。
+截至 2026-11-19 03:10:35（马来西亚时间，UTC+8）已完成 **35/54** 个任务、6 组中的 3 组（ETTh1 H96、ETTh1 H720、Electricity H96）。主表是 3 个 seed 的均值±标准差，不是 best-of-seed。全部 54 个任务跑完后会再更新一次。
+
+Partial day-1 pilot results under the CycleNet protocol are in [`results/pilot_day1_cyclenet/`](results/pilot_day1_cyclenet/README.md).
+As of 2026-11-19 03:10:35 (Malaysia Time, UTC+8), **35/54** jobs and 3 of 6 groups are complete (ETTh1 H96, ETTh1 H720, Electricity H96). Tables use the mean ± SD over three seeds, not a best-of-seed selection. A final update will follow when all 54 jobs finish.
 
 ## Third-party code
 
