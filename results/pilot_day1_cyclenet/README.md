@@ -1,23 +1,22 @@
 # Day-1 pilot results (CycleNet protocol)
 
-**Status: partial.** Snapshot at **2026-11-19 03:10:35 (Malaysia Time, UTC+8)**: **35/54 jobs** finished, the scheduler still running. Three of six groups are complete. A final update will replace this snapshot when all 54 jobs finish.
+**Status: complete, 54/54 jobs.** The scheduler finished at **2026-11-19 10:24:11 (Malaysia Time, UTC+8)** after 31,407 s (8 h 43 m). All six groups are reported below. The earlier 35/54 snapshot has been replaced by this final set.
 
-本目录是第一天试点在 CycleNet 论文设定下的复现快照：冻结的协议与超参、已完成任务的逐 seed 指标，以及已完成组的汇总。主表是 **3 个 seed（2026 / 2027 / 2028）的均值±标准差**，不是 best-of-seed。
+本目录是第一天试点在 CycleNet 论文设定下的完整复现结果：冻结的协议与超参、54 个任务的逐 seed 指标，以及全部 6 组的汇总。主表是 **3 个 seed（2026 / 2027 / 2028）的均值±标准差**，不是 best-of-seed。
 
-This directory is a snapshot of the day-1 pilot under the CycleNet (NeurIPS 2024) iTransformer / CycleiTransformer protocol: the frozen protocol and hyper-parameters, per-seed metrics for finished jobs, and summaries for completed groups. The main tables are **mean ± standard deviation over three seeds** (2026 / 2027 / 2028), not a best-of-seed selection.
+This directory is the complete day-1 pilot under the CycleNet (NeurIPS 2024) iTransformer / CycleiTransformer protocol: the frozen protocol and hyper-parameters, per-seed metrics for all 54 jobs, and summaries for all six groups. The main tables are **mean ± standard deviation over three seeds** (2026 / 2027 / 2028), not a best-of-seed selection.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| [`protocol.json`](protocol.json) | Frozen `--init` protocol (config hash, code hashes, 54 jobs, references). Host paths (`data_dir`, `audit`, `config_file`) are from the machine that ran the pilot. |
+| [`protocol.json`](protocol.json) | Frozen `--init` protocol (config hash, code hashes, 54 jobs, references). Host paths (`data_dir`, `audit`, `config_file`) are from the machine that ran the pilot. Created 2026-11-19 01:31:45 (Malaysia Time, UTC+8). |
 | [`jobs.csv`](jobs.csv) | All 54 jobs and their hyper-parameters |
-| [`results.csv`](results.csv) | Per-seed test MSE / MAE and training diagnostics for the 35 finished jobs (includes 8 unfinished-group rows for Electricity H720; those are **not** summarised below) |
-| [`group_done/`](group_done/) | Per-group JSON written when all 9 jobs of a group finish |
+| [`results.csv`](results.csv) | Per-seed test MSE / MAE and training diagnostics for all 54 jobs |
+| [`group_done/`](group_done/) | Per-group JSON written when all 9 jobs of a group finished |
 | [`group_done.log`](group_done.log) | One-line group summaries, in completion order |
-| [`status.json`](status.json) | Scheduler snapshot at the time above |
+| [`status.json`](status.json) | Final scheduler status (`completed`, 54/54) |
 | [`scheduler.out`](scheduler.out) | Scheduler start / done log |
-| [`SNAPSHOT.md`](SNAPSHOT.md) | Snapshot time, progress, and hash checks |
 | [`../../configs/pilot_day1_cyclenet.json`](../../configs/pilot_day1_cyclenet.json) | Source config (SHA-256 `482cda3f5f810b5118c77cba7e032868ca954744dc0a29ea533d35eb0b4c11ed`, identical to `protocol.json` `config_sha256`). Code SHA-256 values in the protocol match the files in this repository. |
 
 ## Protocol and hyper-parameters
@@ -29,11 +28,11 @@ Common settings (every job): lookback `seq_len = 96`, `n_heads = 8`, GELU, RevIN
 | ETTh1 | 96 | 2 | 256 | 256 | 0.1 | 32 | 1e-4 | 10 | 3 | 24 | Official iTransformer ETTh1 script and `run.py` defaults; cycle length from CycleNet `scripts/CycleNet/Linear-Input-96/etth1.sh`. CycleNet Table 4 has no iTransformer / +RCF run on ETTh1. |
 | ETTh1 | 720 | 2 | 512 | 512 | 0.1 | 32 | 1e-4 | 10 | 3 | 24 | Same, pred_len 720 block of the official iTransformer ETTh1 script. |
 | Electricity | 96 | 3 | 512 | 512 | 0.1 | 16 | 5e-4 | 10 | 3 | 168 | CycleNet `scripts/iTransformer/electricity.sh` |
-| Electricity | 720 | 3 | 512 | 512 | 0.1 | 16 | 5e-4 | 10 | 3 | 168 | Same script (not yet a complete group). |
-| Traffic | 96 | 4 | 512 | 512 | 0.1 | 16 | 1e-3 | 30 | 5 | 168 | CycleNet `scripts/iTransformer/traffic.sh` (not started at this snapshot, except orig seed 2026 which had just begun). |
-| Traffic | 720 | 4 | 512 | 512 | 0.1 | 16 | 1e-3 | 30 | 5 | 168 | Same script (not started). |
+| Electricity | 720 | 3 | 512 | 512 | 0.1 | 16 | 5e-4 | 10 | 3 | 168 | Same script. |
+| Traffic | 96 | 4 | 512 | 512 | 0.1 | 16 | 1e-3 | 30 | 5 | 168 | CycleNet `scripts/iTransformer/traffic.sh` |
+| Traffic | 720 | 4 | 512 | 512 | 0.1 | 16 | 1e-3 | 30 | 5 | 168 | Same script. |
 
-## Completed groups
+## Results
 
 Comparison bases, stated once and used throughout:
 
@@ -44,7 +43,7 @@ Comparison bases, stated once and used throughout:
 - **iTransformer paper** is Liu et al., ICLR 2024, official reported test MSE / MAE.
 - **CycleNet Table 4** is Lin et al., NeurIPS 2024, Table 4, the iTransformer + RCF numbers. That table covers Electricity and Traffic only; ETTh1 has no official iTransformer + RCF reference.
 
-`3/3` means all three seeds of that method have a lower test MSE than the same seed of orig.
+`3/3` (or `0/3`) means how many seeds of that method have a lower test MSE than the same seed of orig.
 
 ### Test MSE / MAE (mean ± SD over 3 seeds)
 
@@ -53,6 +52,9 @@ Comparison bases, stated once and used throughout:
 | ETTh1 | 96 | 0.3852±0.0019 | 0.4026±0.0004 | 0.3841±0.0020 | 0.4019±0.0004 | 0.3827±0.0021 | 0.4009±0.0004 |
 | ETTh1 | 720 | 0.5005±0.0084 | 0.4868±0.0053 | 0.4994±0.0085 | 0.4860±0.0053 | 0.4996±0.0084 | 0.4861±0.0053 |
 | Electricity | 96 | 0.1480±0.0008 | 0.2407±0.0010 | 0.1352±0.0007 | 0.2312±0.0005 | 0.1337±0.0003 | 0.2296±0.0002 |
+| Electricity | 720 | 0.2302±0.0068 | 0.3138±0.0063 | 0.1991±0.0100 | 0.2921±0.0086 | 0.2017±0.0142 | 0.2942±0.0107 |
+| Traffic | 96 | 0.3913±0.0007 | 0.2646±0.0002 | 0.4223±0.0003 | 0.2597±0.0007 | 0.4328±0.0021 | 0.2623±0.0003 |
+| Traffic | 720 | 0.4567±0.0004 | 0.2981±0.0009 | 0.4887±0.0053 | 0.2926±0.0013 | 0.5207±0.0028 | 0.2969±0.0006 |
 
 ### Relative change and paper references
 
@@ -61,28 +63,30 @@ Comparison bases, stated once and used throughout:
 | ETTh1 | 96 | 0.3852 vs 0.386 / 0.405, **−0.22%** | **−0.28% / −0.20%**, 3/3 better | **−0.65% / −0.43%**, 3/3 better | no official number | no official number |
 | ETTh1 | 720 | 0.5005 vs 0.503 / 0.491, **−0.49%** | **−0.24% / −0.17%**, 3/3 better | **−0.18% / −0.14%**, 3/3 better | no official number | no official number |
 | Electricity | 96 | 0.1480 vs 0.148 / 0.240, **+0.03%** | **−8.71% / −3.95%**, 3/3 better | **−9.71% / −4.59%**, 3/3 better | 0.1352 vs 0.136 / 0.231, **−0.62%** | 0.1337 vs 0.136, **−1.71%** |
+| Electricity | 720 | 0.2302 vs 0.225 / 0.317, **+2.31%** | **−13.52% / −6.92%**, 3/3 better | **−12.39% / −6.26%**, 3/3 better | 0.1991 vs 0.194 / 0.287, **+2.62%** | 0.2017 vs 0.194, **+3.96%** |
+| Traffic | 96 | 0.3913 vs 0.395 / 0.268, **−0.94%** | **+7.93% / −1.84%**, 0/3 better | **+10.60% / −0.88%**, 0/3 better | 0.4223 vs 0.415 / 0.263, **+1.76%** | 0.4328 vs 0.415, **+4.28%** |
+| Traffic | 720 | 0.4567 vs 0.467 / 0.302, **−2.21%** | **+7.02% / −1.84%**, 0/3 better | **+14.03% / −0.40%**, 0/3 better | 0.4887 vs 0.491 / 0.294, **−0.46%** | 0.5207 vs 0.491, **+6.06%** |
 
-On ETTh1 the three methods are close. Periodicity is weak (mean lookback R² 0.041 at H96, 0.012 at H720), the learned cycle is small, and the H720 gaps sit inside seed noise (orig MSE SD ≈ 0.008). On Electricity H96 the orig run matches the iTransformer paper, +RCF matches CycleNet Table 4, and +RG improves on both, with a tighter seed spread than +RCF.
+orig is within 1% of the iTransformer paper on ETTh1 and Electricity H96, 2.21% better on Traffic H720, and 2.31% higher on Electricity H720 (seed 2028, 0.2379, pulls that mean up; the other two orig seeds are 0.2254 and 0.2273).
+
++RCF reproduces the CycleNet Table 4 pattern. On Electricity it helps iTransformer (H96 −8.71%, H720 −13.52%, 3/3 seeds), and the H96 number matches Table 4 (0.1352 vs 0.136). On Traffic it raises MSE (H96 +7.93%, H720 +7.02%, 0/3 seeds) while MAE improves by 1.84% at both horizons; the H720 +RCF mean (0.4887) is within 0.5% of Table 4 (0.491).
+
++RG is the best of the three methods on ETTh1 H96 and Electricity H96, and stays with +RCF on ETTh1 H720 and Electricity H720 (still well below orig on Electricity H720). On Traffic it does not recover the MSE loss: +10.60% (H96) and +14.03% (H720) versus orig, and worse than +RCF on both horizons, all six Traffic seeds.
 
 ### +RG gate statistics (test set, mean over 3 seeds)
 
-| Dataset | H | mean R² | mean g_in | mean g_out | corr(g_out, R²) | +RCF Q rms | +RG Q rms |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| ETTh1 | 96 | 0.041 | 0.025 | 0.790 | +0.937 | 0.031 | 0.058 |
-| ETTh1 | 720 | 0.012 | 0.067 | 0.320 | +0.966 | 0.012 | 0.018 |
-| Electricity | 96 | 0.293 | 0.729 | 0.984 | +0.631 | 0.229 | 0.320 |
+| Dataset | H | mean R² | mean g_in | mean g_out | corr(g_in, R²) | corr(g_out, R²) | +RCF Q rms | +RG Q rms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| ETTh1 | 96 | 0.041 | 0.025 | 0.790 | −0.906 | +0.937 | 0.031 | 0.058 |
+| ETTh1 | 720 | 0.012 | 0.067 | 0.320 | −0.863 | +0.966 | 0.012 | 0.018 |
+| Electricity | 96 | 0.293 | 0.729 | 0.984 | +0.484 | +0.631 | 0.229 | 0.320 |
+| Electricity | 720 | 0.340 | 0.546 | 0.990 | +0.077 | +0.576 | 0.249 | 0.353 |
+| Traffic | 96 | 0.390 | 0.750 | 0.985 | +0.483 | +0.432 | 0.295 | 0.427 |
+| Traffic | 720 | 0.470 | 0.666 | 0.983 | +0.364 | +0.428 | 0.336 | 0.517 |
 
-The gate tracks cycle reliability: on Electricity, where the cycle fits well, both gates stay mostly open; on ETTh1, where it does not, `g_in` stays near zero and `g_out` is reduced, more so at H720.
+The gate tracks cycle reliability. On ETTh1, periodicity is weak (mean lookback R² 0.041 / 0.012): `g_in` stays near zero and `g_out` is reduced, more so at H720 (0.32), with a strong positive correlation between `g_out` and R². On Electricity and Traffic the cycle fits well (R² 0.29–0.47) and `g_out` stays open at 0.98–0.99, nearly flat across the horizon. The Electricity H720 `g_in` mean of 0.546 is the average of 0.755, 0.780 and 0.103; seed 2028 is the outlier (`corr(g_in, R²)` on that group is 0.27 / 0.37 / −0.42).
 
-## Pending (at this snapshot)
-
-- **Electricity H720** — 8/9 jobs finished; +RG seed 2027 was still training. No group mean is reported here.
-- **Traffic H96** — orig seed 2026 had just started; the other 8 jobs had not started.
-- **Traffic H720** — not started.
-
-Traffic is the remaining comparison with CycleNet Table 4 (that table reports iTransformer + RCF at 0.415 / 0.263 for H96 and 0.491 / 0.294 for H720, versus the iTransformer paper values 0.395 / 0.268 and 0.467 / 0.302).
-
-## Per-seed test metrics (completed groups only)
+## Per-seed test metrics
 
 All three seeds are listed. None is selected as “best”.
 
@@ -97,3 +101,12 @@ All three seeds are listed. None is selected as “best”.
 | Electricity | 96 | orig | 0.1488 / 0.2414 | 0.1481 / 0.2411 | 0.1472 / 0.2395 |
 | Electricity | 96 | +RCF | 0.1358 / 0.2317 | 0.1353 / 0.2310 | 0.1344 / 0.2308 |
 | Electricity | 96 | +RG | 0.1339 / 0.2298 | 0.1338 / 0.2297 | 0.1334 / 0.2294 |
+| Electricity | 720 | orig | 0.2254 / 0.3089 | 0.2273 / 0.3116 | 0.2379 / 0.3209 |
+| Electricity | 720 | +RCF | 0.1911 / 0.2849 | 0.2104 / 0.3016 | 0.1958 / 0.2899 |
+| Electricity | 720 | +RG | 0.1942 / 0.2893 | 0.1928 / 0.2868 | 0.2181 / 0.3065 |
+| Traffic | 96 | orig | 0.3907 / 0.2645 | 0.3921 / 0.2649 | 0.3911 / 0.2645 |
+| Traffic | 96 | +RCF | 0.4222 / 0.2595 | 0.4227 / 0.2606 | 0.4220 / 0.2592 |
+| Traffic | 96 | +RG | 0.4327 / 0.2621 | 0.4349 / 0.2627 | 0.4307 / 0.2622 |
+| Traffic | 720 | orig | 0.4567 / 0.2970 | 0.4571 / 0.2989 | 0.4562 / 0.2983 |
+| Traffic | 720 | +RCF | 0.4941 / 0.2941 | 0.4834 / 0.2917 | 0.4887 / 0.2920 |
+| Traffic | 720 | +RG | 0.5240 / 0.2963 | 0.5195 / 0.2975 | 0.5188 / 0.2968 |

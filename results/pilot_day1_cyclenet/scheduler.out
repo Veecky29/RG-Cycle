@@ -74,3 +74,43 @@ DONE Electricity H720 rg seed2026
 START Electricity H720 rg seed2028
 DONE Electricity H720 rg seed2028
 START Traffic H96 orig seed2026
+DONE Electricity H720 rg seed2027
+GROUP_DONE Electricity H720 | orig 0.2302 iTr(paper) 0.225 CycleNet-iTr+RCF(paper) 0.194 | rcf 0.1991±0.0100 (-13.52% vs orig, 3/3 better, CV 5.04%) | rg 0.2017±0.0142 (-12.39% vs orig, 3/3 better, CV 7.05%) g_in 0.546 g_out 0.990 buckets 0.988/0.991/0.991/0.992
+START Traffic H96 orig seed2027
+DONE Traffic H96 orig seed2026
+START Traffic H96 orig seed2028
+DONE Traffic H96 orig seed2027
+START Traffic H96 rcf seed2026
+DONE Traffic H96 rcf seed2026
+START Traffic H96 rcf seed2027
+DONE Traffic H96 orig seed2028
+START Traffic H96 rcf seed2028
+DONE Traffic H96 rcf seed2027
+START Traffic H96 rg seed2026
+DONE Traffic H96 rcf seed2028
+START Traffic H96 rg seed2027
+DONE Traffic H96 rg seed2026
+START Traffic H96 rg seed2028
+DONE Traffic H96 rg seed2027
+START Traffic H720 orig seed2026
+DONE Traffic H96 rg seed2028
+GROUP_DONE Traffic H96 | orig 0.3913 iTr(paper) 0.395 CycleNet-iTr+RCF(paper) 0.415 | rcf 0.4223±0.0003 (+7.93% vs orig, 0/3 better, CV 0.07%) | rg 0.4328±0.0021 (+10.60% vs orig, 0/3 better, CV 0.48%) g_in 0.750 g_out 0.985 buckets 0.984/0.986/0.985/0.983
+START Traffic H720 orig seed2027
+DONE Traffic H720 orig seed2026
+START Traffic H720 orig seed2028
+DONE Traffic H720 orig seed2027
+START Traffic H720 rcf seed2026
+DONE Traffic H720 orig seed2028
+START Traffic H720 rcf seed2027
+DONE Traffic H720 rcf seed2026
+START Traffic H720 rcf seed2028
+DONE Traffic H720 rcf seed2027
+START Traffic H720 rg seed2026
+DONE Traffic H720 rcf seed2028
+START Traffic H720 rg seed2027
+DONE Traffic H720 rg seed2026
+START Traffic H720 rg seed2028
+DONE Traffic H720 rg seed2027
+DONE Traffic H720 rg seed2028
+GROUP_DONE Traffic H720 | orig 0.4567 iTr(paper) 0.467 CycleNet-iTr+RCF(paper) 0.491 | rcf 0.4887±0.0053 (+7.02% vs orig, 0/3 better, CV 1.09%) | rg 0.5207±0.0028 (+14.03% vs orig, 0/3 better, CV 0.54%) g_in 0.666 g_out 0.983 buckets 0.981/0.982/0.984/0.984
+ALL_PILOT_JOBS_COMPLETE
